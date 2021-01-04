@@ -11,7 +11,7 @@ export class FileWatch {
     watch(this.path,{
       ignored: ['node_modules','tmp']
     }).on("all", (event:InstructionType, path:string) => {
-      console.log("new event", event)
+      //console.log("new event", event)
       // TODO: remove timeout and use Promises instead
       setTimeout(() => {
         const commandSender = new CommandSender(this.server);
