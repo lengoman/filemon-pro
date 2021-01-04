@@ -1,52 +1,54 @@
 import axios, {AxiosResponse} from "axios";
+import {Instruction, InstructionType, Status} from "../definitions";
+import {ApiConnector} from "../api/ApiConnector";
 
-export enum InstructionType {
-    Add = "add",
-    AddDir = "addDir",
-    UnLink = "unLink",
-    UnlinkDir = "unLinkDir",
-    Change = "change"
-}
 
-export enum Status {
-    Send = "send",
-    Received = "received",
-    Processing = "processing",
-    Failure = "failure",
-    Done = "done"
-}
-
-export interface Instruction{
-    path?:string;
-    base64Compress?:string;
-    type:InstructionType;
-    status?:Status;
-}
 
 export class CommandSender {
-    constructor(public instruction:Instruction, public server:string) {}
+    constructor(public server:string) {}
 
-    execute(){
-        switch (this.instruction.type){
-            case InstructionType.Add || InstructionType.Change:{
-                console.log("adding execute", this.instruction)
-                if(this.instruction.path && this.instruction.base64Compress) {
-                    this.send();
+    apiConnector:ApiConnector=new ApiConnector(this.server)
+
+    execute(instruction:Instruction){
+        console.log("executing",instruction)
+        const {type, path, base64Compress} = instruction
+        return new Promise((resolve)=>
+        {
+            switch (type) {
+                case InstructionType.Add:
+                case InstructionType.Change: {
+                    if (path && base64Compress) {
+                        resolve(this.send(instruction));
+                    }
                 }
-            };break;
-            case InstructionType.AddDir || InstructionType.UnLink || InstructionType.UnlinkDir:{
-                if(this.instruction.path){
-                    this.send()
+                    ;
+                    break;
+                case InstructionType.AddDir:
+                case InstructionType.UnLink:
+                case InstructionType.UnlinkDir: {
+                    if (path) {
+                        resolve(this.send(instruction))
+                    }
                 }
+                    ;
+                    break;
+                case InstructionType.UpdateMD5:{
+                    if(path) {
+                        resolve(this.apiConnector.addOrUpdateMD5(instruction))
+                    }
+                };break;
             }
-        }
-    }
-    private send(){
-        this.instruction.status = Status.Send;
-        axios.post(`${this.server}`, this.instruction).then((response:AxiosResponse)=>{
-            console.log(response.data)
-        }).catch(fail=>{
-            console.log("fail",fail.data)
         })
+    }
+    send(instruction:Instruction){
+        //Add retry to connect
+        instruction.status = Status.Send;
+        return this.apiConnector.postCommand(instruction).then((response:AxiosResponse)=>{
+                    return response.data
+                }).catch(()=>{
+                    return new Error("fail to connect to server")
+                })
+
+
     }
 }
